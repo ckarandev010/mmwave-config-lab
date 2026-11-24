@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>mmWave Config Lab</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <h1>mmWave Config Lab</h1>
+      <p class="sub">See what a TI mmWave radar config does before you flash it: which lines the firmware will reject, what the chirp can measure, and how a scene looks to it.</p>
+    </div>
+    <div class="top-right">
+      <div class="row">
+        <button class="btn" id="openBtn" type="button">Open .cfg</button>
+        <button class="btn" id="saveBtn" type="button">Save .cfg</button>
+        <button class="btn" id="copyBtn" type="button">Copy</button>
+        <input type="file" id="fileInput" accept=".cfg,.txt" hidden>
+      </div>
+      <div id="verdict" class="verdict ok" role="status"><span class="dot"></span><span id="verdictText">Checking…</span></div>
+    </div>
+  </header>
+
+  <div class="grid">
+    <div class="col">
+      <section class="panel">
+        <div class="hd"><h2>Setup</h2><span class="hint" id="fileName">no file open</span></div>
+        <div class="bd setup">
+          <div><label class="lbl" for="preset">Example</label><select id="preset"></select></div>
+          <div><label class="lbl" for="firmware">Firmware</label><select id="firmware"></select></div>
+          <div><label class="lbl" for="device">Device</label><select id="device"></select></div>
+          <div class="pair">
+            <div><label class="lbl" for="bandLo">Allowed band from (GHz)</label><input id="bandLo" type="number" step="0.05"></div>
+            <div><label class="lbl" for="bandHi">to (GHz)</label><input id="bandHi" type="number" step="0.05"></div>
+          </div>
+          <div><label class="lbl" for="baud">Data port</label>
+            <select id="baud"><option value="921600">UART 921,600 baud</option><option value="460800">UART 460,800 baud</option><option value="115200">UART 115,200 baud</option><option value="3125000">UART 3,125,000 baud</option></select>
+          </div>
+          <div class="pair" id="mountRow">
+            <div><label class="lbl" for="mountH">Mount height (m)</label><input id="mountH" type="number" step="0.1" value="1.0"></div>
+            <div><label class="lbl" for="mountTilt">Down tilt (°)</label><input id="mountTilt" type="number" step="1" value="0"></div>
+          </div>
+          <p class="note" id="mountNote"></p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="hd"><h2>Config</h2><span class="hint" id="lineCount"></span></div>
+        <div class="bd">
+          <div class="editor" id="dropZone">
+            <div class="gutter" id="gutter" aria-hidden="true"></div>
+            <textarea id="cfg" spellcheck="false" autocomplete="off" aria-label="Radar config, one command per line"></textarea>
+          </div>
+          <p class="note">Drop a .cfg file here, or edit the text. Comments start with %.</p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="hd"><h2>What the radar will say</h2><span class="hint">click an item to jump to its line</span></div>
+        <div class="bd"><div class="issues" id="issues"></div></div>
+      </section>
+    </div>
+
+    <div class="col">
+      <div class="metrics" id="metrics"></div>
+
+      <section class="panel">
+        <div class="hd"><h2>Quick changes</h2><span class="hint">each slider rewrites its line in the config</span></div>
+        <div class="bd"><div class="controls" id="controls"></div></div>
+      </section>
+
+      <div class="views">
+        <section class="panel">
+          <div class="hd"><h2>From above</h2><span class="hint">radar at the bottom, looking up the page</span></div>
+          <div class="bd">
+            <canvas id="room" width="760" height="620" aria-label="Top-down view of the field of view, zones, targets and detections"></canvas>
+            <div class="legend">
+              <span><i class="sw beam"></i>field of view</span>
+              <span><i class="sw pt"></i>detected point</span>
+              <span><i class="sw out"></i>point outside the tracking zone / static</span>
+              <span><i class="sw trk"></i>track</span>
+            </div>
+            <div class="readout" id="roomReadout"></div>
+          </div>
+        </section>
+        <div class="col">
+          <section class="panel">
+            <div class="hd"><h2>Range–Doppler</h2><span class="hint">every reflector as the radar sees it</span></div>
+            <div class="bd"><canvas id="rd" width="620" height="300" aria-label="Range-Doppler map of the scene"></canvas><div id="rdNote"></div></div>
+          </section>
+          <section class="panel">
+            <div class="hd"><h2>Side view</h2><span class="hint">height, tilt and elevation field of view</span></div>
+            <div class="bd"><canvas id="side" width="620" height="260" aria-label="Side view of the beam"></canvas></div>
+          </section>
+        </div>
+      </div>
+
+      <section class="panel">
+        <div class="hd"><h2>Doppler over time</h2><span class="hint">micro-Doppler of the whole scene</span></div>
+        <div class="bd"><canvas id="spec" width="1100" height="240" aria-label="Doppler spectrogram over time"></canvas><div id="specNote"></div></div>
+      </section>
+
+      <section class="panel">
+        <div class="hd"><h2>One frame of chirps</h2><span class="hint">profileCfg, chirpCfg and frameCfg</span></div>
+        <div class="bd"><canvas id="chirp" width="1100" height="250" aria-label="Chirp timing diagram"></canvas></div>
+      </section>
+
+      <section class="panel">
+        <div class="hd"><h2>Scene</h2><span class="hint">simulated targets, not real data</span></div>
+        <div class="bd">
+          <div class="scene-wrap"><table class="scene" id="sceneTable"></table></div>
+          <div class="row" style="margin-top:10px">
+            <select id="addType" aria-label="Target type to add"><option value="person">Walking person</option><option value="mover">Moving object</option><option value="fan">Spinning fan</option><option value="static">Static object</option></select>
+            <button class="btn" id="addBtn" type="button">Add target</button>
+            <label class="inline" for="refRange">1 m² target detectable to <input id="refRange" type="number" value="15" min="2" max="80" step="1"> m</label>
+            <button class="btn" id="playBtn" type="button">Pause</button>
+          </div>
+          <p class="note">Positions in metres: x sideways, y straight out from the radar, z height above the floor. Heading 0° walks straight at the radar. Detection, noise and tracking are a simplified model meant to show trends, not to predict exact numbers.</p>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <footer>Open source. Not affiliated with or endorsed by Texas Instruments. Argument rules come from the mmWave SDK 3.6 and Radar Toolbox sources; physics uses the standard FMCW formulas. A config that passes here can still fail on hardware, so test on a bench before deploying.</footer>
+</div>
+<script src="engine.js"></script>
+<script src="presets.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
